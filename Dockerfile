@@ -5,4 +5,4 @@ WORKDIR /usr/src/app
 COPY . .
 RUN pip install requests
 
-CMD ["python", "./main.py"]
+CMD ["python", "main.py"]
