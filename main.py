@@ -1,6 +1,7 @@
 import os
 import sys
 import logging
+import time
 import requests
 from utils.logging_config import setup_logging
 from utils.config import cloudflare_config
@@ -85,11 +86,13 @@ def update_cloudflare_domain(new_ip, record_id):
 
 
 if __name__ == "__main__":
-    current_ip = get_public_ip()
-    if current_ip != get_saved_ip():
-        logger.info(
-            f"New IP detected... Updating domain to IP: {current_ip}")
+    while True:
+        current_ip = get_public_ip()
+        if current_ip != get_saved_ip():
+            logger.info(
+                f"New IP detected... Updating domain to IP: {current_ip}")
 
-        update_cloudflare_domain(
-            new_ip=current_ip, record_id=get_cloudflare_record_id())
-        save_ip(current_ip)
+            update_cloudflare_domain(
+                new_ip=current_ip, record_id=get_cloudflare_record_id())
+            save_ip(current_ip)
+        time.sleep(60 * 30)
