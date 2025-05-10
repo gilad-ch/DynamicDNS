@@ -1,1 +1,8 @@
 utils/config.py
+saved_ip.txt
+.env
+uv.lock
+pyproject.toml
+.python-version
+.logs
+logs/*

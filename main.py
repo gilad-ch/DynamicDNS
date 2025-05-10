@@ -2,25 +2,32 @@ import os
 import logging
 import time
 import requests
+from dotenv import load_dotenv
 from utils.logging_config import setup_logging
-from utils.config import cloudflare_config
 
 setup_logging()
 logger = logging.getLogger()
+load_dotenv()
 
 BASE_URL = "https://api.cloudflare.com/client/v4/zones/"
+CLOUDFLARE_ZONEID = os.getenv("CLOUDFLARE_ZONEID")
+CLOUDFLARE_API_TOKEN = os.getenv("CLOUDFLARE_API_TOKEN")
+CLOUDFLARE_DOMAIN_LIST = [d.strip() for d in os.getenv("CLOUDFLARE_DOMAIN_LIST", "").split(',') if d.strip()]
+
+if not CLOUDFLARE_ZONEID or not CLOUDFLARE_API_TOKEN or not CLOUDFLARE_DOMAIN_LIST:
+    logger.critical("Missing required environment variables. Check .env file.")
+    exit(1)
+
 
 
 def get_public_ip():
     try:
-        logger.debug(f'Fetching public ip')
-        result = requests.request(
-            method="GET", url="https://api.ipify.org?format=json")
+        logger.debug('Fetching public IP')
+        result = requests.get("https://api.ipify.org?format=json")
         result.raise_for_status()
         return result.json()['ip']
     except Exception as e:
-        logger.error(f'Failed to fetch public ip from api.ipify.org: {e}')
-        raise
+        logger.error(f'Failed to fetch public IP: {e}')
 
 
 def save_ip(ip):
@@ -31,17 +38,14 @@ def save_ip(ip):
 def get_saved_ip():
     if os.path.exists("saved_ip.txt"):
         with open("saved_ip.txt", "r") as f:
-            return f.read()
-    else:
-        return None
+            return f.read().strip()
+    return None
 
 
-def get_cloudflare_record_id():
-    """Retrieve the DNS record ID dynamically based on the record name."""
-    url = f"{BASE_URL}{
-        cloudflare_config.ZONE_ID}/dns_records"
+def get_cloudflare_record_id(domain_name):
+    url = f"{BASE_URL}{CLOUDFLARE_ZONEID}/dns_records"
     headers = {
-        "Authorization": f"Bearer {cloudflare_config.CLOUDFLARE_API_TOKEN}",
+        "Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}",
         "Content-Type": "application/json",
     }
     try:
@@ -49,49 +53,46 @@ def get_cloudflare_record_id():
         response.raise_for_status()
         records = response.json().get("result", [])
         for record in records:
-            if record["name"] == cloudflare_config.DNS_RECORD_NAME:
+            if record["name"] == domain_name:
                 return record["id"]
-
-        logger.error(f"DNS record with name '{
-            cloudflare_config.DNS_RECORD_NAME}' not found.")
-        raise
+        raise ValueError(f"DNS record with name '{domain_name}' not found.")
     except requests.RequestException as e:
         logger.error(f"Failed to fetch DNS records: {e}")
-        raise
 
 
-def update_cloudflare_domain(new_ip, record_id):
-    url = f"{BASE_URL}{
-        cloudflare_config.ZONE_ID}/dns_records/{record_id}"
+def update_cloudflare_domain(new_ip, record_id, domain_name):
+    url = f"{BASE_URL}{CLOUDFLARE_ZONEID}/dns_records/{record_id}"
     headers = {
-        "Authorization": f"Bearer {cloudflare_config.CLOUDFLARE_API_TOKEN}",
+        "Authorization": f"Bearer {CLOUDFLARE_API_TOKEN}",
         "Content-Type": "application/json",
     }
     data = {
-        "type": "A",  # Use "AAAA" for IPv6
-        "name": cloudflare_config.DNS_RECORD_NAME,
+        "type": "A",
+        "name": domain_name,
         "content": new_ip,
-        "ttl": 1,  # 1 for Auto TTL
-        "proxied": False,  # Set to False if you don't want Cloudflare's proxy
+        "ttl": 1,
+        "proxied": False,
     }
-
     try:
         response = requests.put(url, json=data, headers=headers)
         response.raise_for_status()
-        logger.info(f"DNS record updated successfully to {new_ip}.")
+        logger.info(f"Updated '{domain_name}' to {new_ip}.")
     except requests.RequestException as e:
-        logger.error(f"Error updating DNS record: {e}")
-        raise
+        logger.error(f"Error updating DNS record for {domain_name}: {e}")
 
 
 if __name__ == "__main__":
     while True:
-        current_ip = get_public_ip()
-        if current_ip != get_saved_ip():
-            logger.info(
-                f"New IP detected... Updating domain to IP: {current_ip}")
-
-            update_cloudflare_domain(
-                new_ip=current_ip, record_id=get_cloudflare_record_id())
-            save_ip(current_ip)
-        time.sleep(60 * 30)
+        try:
+            current_ip = get_public_ip()
+            if current_ip != get_saved_ip():
+                logger.info(f"New IP detected: {current_ip}")
+                for domain_name in CLOUDFLARE_DOMAIN_LIST:
+                    record_id = get_cloudflare_record_id(domain_name)
+                    update_cloudflare_domain(current_ip, record_id, domain_name)
+                save_ip(current_ip)
+            else:
+                logger.debug("IP has not changed. No update needed.")
+        except Exception as e:
+            logger.error(f"Unhandled error: {e}")
+        time.sleep(60 * 10)
