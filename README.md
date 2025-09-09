@@ -9,27 +9,25 @@ This script automates updating a Cloudflare DNS record with your current public 
 - Logs all actions/errors for debugging.
 
 **Setup:**
-1. **Requirements:**
-   - Install: `pip install requests`
-
-2. **Cloudflare Configuration:**
+ **Cloudflare Configuration:**
    - Create an API token with **Edit** permissions for DNS in your zone (*Profile → API Tokens*).
-   - In `utils/config.py`, add:
-     ```python
-     cloudflare_config = {
-         "CLOUDFLARE_API_TOKEN": "your-api-token-here",
-         "ZONE_ID": "your-zone-id",
-         "DNS_RECORD_NAME": "subdomain.example.com"  # Record to update
-     }
-     ```
+   - **Environment Variables (.env):**
+     - `CLOUDFLARE_ZONEID` – Cloudflare Zone ID.  
+     - `CLOUDFLARE_API_TOKEN` – API token with DNS edit permissions.  
+     - `CLOUDFLARE_DOMAIN_LIST` – Comma-separated list of domains to update. 
 
 **Usage:**
-- Run manually: `python script.py`
-- **Automate:** Add a cron job (e.g., every 15 minutes):
-  ```bash
-  */15 * * * * /usr/bin/python3 /path/to/script.py
-  ```
+- Run manually: `python main.py`
 
-**Notes:**
-- Logs are stored in `logs/cloudflare_ddns.log` (auto-generated).
-- For IPv6, change `type: "A"` to `"AAAA"` in `update_cloudflare_domain()`.
+- **Docker Run:**
+  ```bash
+  docker build -t cloudflare-ddns .
+  ```
+  ```bash
+  docker run -d \
+  --name cloudflare-ddns \
+  --env-file .env \
+  -v $(pwd)/saved_ip.txt:/app/saved_ip.txt \
+  cloudflare-ddns
+
+  ```
