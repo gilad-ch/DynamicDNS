@@ -3,8 +3,8 @@
 This script automates updating a Cloudflare DNS record with your current public IP address. Ideal for dynamic IP environments (e.g., home servers).
 
 **Key Features:**
-- Fetches your public IP using `api.ipify.org`.
-- Compares it to the last-saved IP (`saved_ip.txt`).
+- Fetches your public IP.
+- Compares it to the last-saved IP.
 - Updates Cloudflare DNS via API if the IP changes.
 - Logs all actions/errors for debugging.
 
