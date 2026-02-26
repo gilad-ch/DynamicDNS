@@ -1,5 +1,6 @@
 utils/config.py
 saved_ip.txt
+saved_ip.txt.tmp
 .env
 uv.lock
 pyproject.toml
